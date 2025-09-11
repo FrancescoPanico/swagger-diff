@@ -1,6 +1,9 @@
 # swagger-diff
 
-
+## Utilizzo
+```
+java -jar swagger-diff-1.2.2.jar -old File.yaml -new fileNuovo.yaml -v 2.0 -output-mode html > diff.md  
+```
 
 ## Getting started
 
