@@ -93,6 +93,11 @@
 			<version>4.8.2</version>
 			<scope>test</scope>
 		</dependency>
+		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-simple</artifactId>
+			<version>1.7.36</version>
+		</dependency>
 	</dependencies>
 
 	<profiles>
@@ -199,6 +204,32 @@
 				<artifactId>coveralls-maven-plugin</artifactId>
 				<version>4.3.0</version>
 			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-jar-plugin</artifactId>
+				<version>3.3.0</version>
+				<configuration>
+					<archive>
+						<manifest>
+							<mainClass>com.deepoove.swagger.diff.cli.CLI</mainClass>
+						</manifest>
+					</archive>
+				</configuration>
+			</plugin>
+			<plugin>
+				<artifactId>maven-assembly-plugin</artifactId>
+				<configuration>
+					<archive>
+					<manifest>
+						<mainClass>com.deepoove.swagger.diff.cli.CLI</mainClass>
+					</manifest>
+					</archive>
+					<descriptorRefs>
+					<descriptorRef>jar-with-dependencies</descriptorRef>
+					</descriptorRefs>
+				</configuration>
+			</plugin>
+
 		</plugins>
 	</build>
 </project>
