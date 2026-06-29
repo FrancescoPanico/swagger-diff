@@ -2,9 +2,9 @@ package com.deepoove.swagger.diff.output;
 
 import com.deepoove.swagger.diff.SwaggerDiff;
 import com.deepoove.swagger.diff.model.*;
-import io.swagger.models.HttpMethod;
-import io.swagger.models.parameters.Parameter;
-import io.swagger.models.properties.Property;
+import io.swagger.v3.oas.models.PathItem;
+import io.swagger.v3.oas.models.media.Schema;
+import io.swagger.v3.oas.models.parameters.Parameter;
 import j2html.tags.ContainerTag;
 
 import java.util.ArrayList;
@@ -28,7 +28,6 @@ public class HtmlRender implements Render {
         this.linkCss = linkCss;
     }
 
-
     public String render(SwaggerDiff diff) {
         List<Endpoint> newEndpoints = diff.getNewEndpoints();
         ContainerTag ol_newEndpoint = ol_newEndpoint(newEndpoints);
@@ -44,12 +43,13 @@ public class HtmlRender implements Render {
         return renderHtml(ol_newEndpoint, ol_missingEndpoint, ol_changed, p_versions);
     }
 
-    public String renderHtml(ContainerTag ol_new, ContainerTag ol_miss, ContainerTag ol_changed, ContainerTag p_versions) {
+    public String renderHtml(ContainerTag ol_new, ContainerTag ol_miss, ContainerTag ol_changed,
+                             ContainerTag p_versions) {
         ContainerTag html = html().attr("lang", "en").with(
             head().with(
                 meta().withCharset("utf-8"),
                 title(title),
-                script(rawHtml("function showHide(id){if(document.getElementById(id).style.display==\'none\'){document.getElementById(id).style.display=\'block\';document.getElementById(\'btn_\'+id).innerHTML=\'&uArr;\';}else{document.getElementById(id).style.display=\'none\';document.getElementById(\'btn_\'+id).innerHTML=\'&dArr;\';}return true;}")).withType("text/javascript"),
+                script(rawHtml("function showHide(id){if(document.getElementById(id).style.display=='none'){document.getElementById(id).style.display='block';document.getElementById('btn_'+id).innerHTML='&uArr;';}else{document.getElementById(id).style.display='none';document.getElementById('btn_'+id).innerHTML='&dArr;';}return true;}")).withType("text/javascript"),
                 link().withRel("stylesheet").withHref(linkCss)
             ),
             body().with(
@@ -62,50 +62,45 @@ public class HtmlRender implements Render {
                 )
             )
         );
-
         return document().render() + html.render();
     }
 
     private ContainerTag div_headArticle(final String title, final String type, final ContainerTag ol) {
-        return div().with(h2(title).with(a(rawHtml("&uArr;")).withId("btn_" + type).withClass("showhide").withHref("#").attr("onClick", "javascript:showHide('" + type + "');")), hr(), ol);
+        return div().with(h2(title).with(a(rawHtml("&uArr;")).withId("btn_" + type)
+                .withClass("showhide").withHref("#").attr("onClick", "javascript:showHide('" + type + "')")),
+                hr(), ol);
     }
 
     private ContainerTag p_versions(String oldVersion, String newVersion) {
-        ContainerTag p = p().withId("versions");
-        p.withText("Changes from " + oldVersion + " to " + newVersion + ".");
-        return p;
+        return p().withId("versions").withText("Changes from " + oldVersion + " to " + newVersion + ".");
     }
 
     private ContainerTag ol_newEndpoint(List<Endpoint> endpoints) {
         if (null == endpoints) return ol().withId("new");
         ContainerTag ol = ol().withId("new");
         for (Endpoint endpoint : endpoints) {
-            ol.with(li_newEndpoint(endpoint.getMethod().toString(),
-                endpoint.getPathUrl(), endpoint.getSummary()));
+            ol.with(li_newEndpoint(endpoint.getMethod().name(), endpoint.getPathUrl(), endpoint.getSummary()));
         }
         return ol;
     }
 
-    private ContainerTag li_newEndpoint(String method, String path,
-                                        String desc) {
-        return li().with(span(method).withClass(method)).withText(path + " ")
-            .with(span(null == desc ? "" : desc));
+    private ContainerTag li_newEndpoint(String method, String path, String desc) {
+        return li().with(span(method).withClass(method.toLowerCase()))
+                .withText(path + " ").with(span(null == desc ? "" : desc));
     }
 
     private ContainerTag ol_missingEndpoint(List<Endpoint> endpoints) {
         if (null == endpoints) return ol().withId("deprecated");
         ContainerTag ol = ol().withId("deprecated");
         for (Endpoint endpoint : endpoints) {
-            ol.with(li_missingEndpoint(endpoint.getMethod().toString(),
-                endpoint.getPathUrl(), endpoint.getSummary()));
+            ol.with(li_missingEndpoint(endpoint.getMethod().name(), endpoint.getPathUrl(), endpoint.getSummary()));
         }
         return ol;
     }
 
-    private ContainerTag li_missingEndpoint(String method, String path,
-                                            String desc) {
-        return li().with(span(method).withClass(method),
-            del().withText(path)).with(span(null == desc ? "" : " " + desc));
+    private ContainerTag li_missingEndpoint(String method, String path, String desc) {
+        return li().with(span(method).withClass(method.toLowerCase()), del().withText(path))
+                .with(span(null == desc ? "" : " " + desc));
     }
 
     private ContainerTag ol_changed(List<ChangedEndpoint> changedEndpoints) {
@@ -113,9 +108,9 @@ public class HtmlRender implements Render {
         ContainerTag ol = ol().withId("changed");
         for (ChangedEndpoint changedEndpoint : changedEndpoints) {
             String pathUrl = changedEndpoint.getPathUrl();
-            Map<HttpMethod, ChangedOperation> changedOperations = changedEndpoint.getChangedOperations();
-            for (Entry<HttpMethod, ChangedOperation> entry : changedOperations.entrySet()) {
-                String method = entry.getKey().toString();
+            Map<PathItem.HttpMethod, ChangedOperation> changedOperations = changedEndpoint.getChangedOperations();
+            for (Entry<PathItem.HttpMethod, ChangedOperation> entry : changedOperations.entrySet()) {
+                String method = entry.getKey().name();
                 ChangedOperation changedOperation = entry.getValue();
                 String desc = changedOperation.getSummary();
 
@@ -132,56 +127,52 @@ public class HtmlRender implements Render {
                 if (changedOperation.isDiffConsumes()) {
                     ul_detail.with(li().with(h3("Consumes")).with(ul_consume(changedOperation)));
                 }
-                ol.with(li().with(span(method).withClass(method)).withText(pathUrl + " ").with(span(null == desc ? "" : desc))
-                    .with(ul_detail));
+                if (isDiffResponses(changedOperation)) {
+                    ul_detail.with(li().with(h3("Responses")).with(ul_responses(changedOperation)));
+                }
+                ol.with(li().with(span(method).withClass(method.toLowerCase()))
+                        .withText(pathUrl + " ").with(span(null == desc ? "" : desc))
+                        .with(ul_detail));
             }
         }
         return ol;
     }
 
+    @SuppressWarnings("rawtypes")
     private ContainerTag ul_response(ChangedOperation changedOperation) {
         List<ElProperty> addProps = changedOperation.getAddProps();
         List<ElProperty> delProps = changedOperation.getMissingProps();
         List<ElProperty> chgProps = changedOperation.getChangedProps();
         ContainerTag ul = ul().withClass("change response");
-        for (ElProperty prop : addProps) {
-            ul.with(li_addProp(prop));
-        }
-        for (ElProperty prop : delProps) {
-            ul.with(li_missingProp(prop));
-        }
-        for (ElProperty prop : chgProps) {
-            ul.with(li_changedProp(prop));
-        }
+        for (ElProperty prop : addProps) ul.with(li_addProp(prop));
+        for (ElProperty prop : delProps) ul.with(li_missingProp(prop));
+        for (ElProperty prop : chgProps) ul.with(li_changedProp(prop));
         return ul;
     }
 
+    @SuppressWarnings("rawtypes")
     private ContainerTag li_missingProp(ElProperty prop) {
-        Property property = prop.getProperty();
-        return li().withClass("missing").withText("Delete").with(del(prop.getEl())).with(span(null == property.getDescription() ? "" : ("//" + property.getDescription())).withClass("comment"));
+        Schema property = prop.getProperty();
+        String desc = property != null ? property.getDescription() : null;
+        return li().withClass("missing").withText("Delete").with(del(prop.getEl()))
+                .with(span(null == desc ? "" : ("//" + desc)).withClass("comment"));
     }
 
+    @SuppressWarnings("rawtypes")
     private ContainerTag li_addProp(ElProperty prop) {
-        Property property = prop.getProperty();
-        return li().withText("Add " + prop.getEl()).with(span(null == property.getDescription() ? "" : ("//" + property.getDescription())).withClass("comment"));
+        Schema property = prop.getProperty();
+        String desc = property != null ? property.getDescription() : null;
+        return li().withText("Add " + prop.getEl())
+                .with(span(null == desc ? "" : ("//" + desc)).withClass("comment"));
     }
 
     private ContainerTag li_changedProp(ElProperty prop) {
         List<String> changeDetails = new ArrayList<>();
-        String changeDetailsHeading = "";
-        if (prop.isTypeChange()) {
-            changeDetails.add("Data Type");
-        }
-        if (prop.isNewEnums()) {
-            changeDetails.add("Added Enum");
-        }
-        if (prop.isRemovedEnums()) {
-            changeDetails.add("Removed Enum");
-        }
-        if (! changeDetails.isEmpty()) {
-            changeDetailsHeading = " (" + String.join(", ", changeDetails) + ")";
-        }
-        return li().withText("Change " + prop.getEl()).with(span(changeDetailsHeading).withClass("comment"));
+        if (prop.isTypeChange()) changeDetails.add("Data Type");
+        if (prop.isNewEnums()) changeDetails.add("Added Enum");
+        if (prop.isRemovedEnums()) changeDetails.add("Removed Enum");
+        String heading = changeDetails.isEmpty() ? "" : " (" + String.join(", ", changeDetails) + ")";
+        return li().withText("Change " + prop.getEl()).with(span(heading).withClass("comment"));
     }
 
     private ContainerTag ul_param(ChangedOperation changedOperation) {
@@ -189,85 +180,59 @@ public class HtmlRender implements Render {
         List<Parameter> delParameters = changedOperation.getMissingParameters();
         List<ChangedParameter> changedParameters = changedOperation.getChangedParameter();
         ContainerTag ul = ul().withClass("change param");
-        for (Parameter param : addParameters) {
-            ul.with(li_addParam(param));
+        for (Parameter param : addParameters) ul.with(li_addParam(param));
+        for (ChangedParameter param : changedParameters) {
+            for (ElProperty prop : param.getIncreased()) ul.with(li_addProp(prop));
         }
         for (ChangedParameter param : changedParameters) {
-            List<ElProperty> increased = param.getIncreased();
-            for (ElProperty prop : increased) {
-                ul.with(li_addProp(prop));
-            }
+            if (param.isChangeRequired() || param.isChangeDescription()) ul.with(li_changedParam(param));
         }
         for (ChangedParameter param : changedParameters) {
-            boolean changeRequired = param.isChangeRequired();
-            boolean changeDescription = param.isChangeDescription();
-            if (changeRequired || changeDescription)
-                ul.with(li_changedParam(param));
+            for (ElProperty prop : param.getMissing()) ul.with(li_missingProp(prop));
+            for (ElProperty prop : param.getChanged()) ul.with(li_changedProp(prop));
         }
-        for (ChangedParameter param : changedParameters) {
-            List<ElProperty> missing = param.getMissing();
-            for (ElProperty prop : missing) {
-                ul.with(li_missingProp(prop));
-            }
-        }
-        for (ChangedParameter param : changedParameters) {
-            List<ElProperty> changed = param.getChanged();
-            for (ElProperty prop : changed) {
-                ul.with(li_changedProp(prop));
-            }
-        }
-        for (Parameter param : delParameters) {
-            ul.with(li_missingParam(param));
-        }
+        for (Parameter param : delParameters) ul.with(li_missingParam(param));
         return ul;
     }
 
     private ContainerTag li_addParam(Parameter param) {
-        return li().withText("Add " + param.getName()).with(span(null == param.getDescription() ? "" : ("//" + param.getDescription())).withClass("comment"));
+        return li().withText("Add " + param.getName())
+                .with(span(null == param.getDescription() ? "" : ("//" + param.getDescription())).withClass("comment"));
     }
 
     private ContainerTag li_missingParam(Parameter param) {
-        return li().withClass("missing").with(span("Delete")).with(del(param.getName())).with(span(null == param.getDescription() ? "" : ("//" + param.getDescription())).withClass("comment"));
+        return li().withClass("missing").with(span("Delete")).with(del(param.getName()))
+                .with(span(null == param.getDescription() ? "" : ("//" + param.getDescription())).withClass("comment"));
     }
 
     private ContainerTag li_changedParam(ChangedParameter changeParam) {
-        boolean changeRequired = changeParam.isChangeRequired();
-        boolean changeDescription = changeParam.isChangeDescription();
         Parameter rightParam = changeParam.getRightParameter();
         Parameter leftParam = changeParam.getLeftParameter();
         ContainerTag li = li().withText(rightParam.getName());
-        if (changeRequired) {
-            li.withText(" change into " + (rightParam.getRequired() ? "required" : "not required"));
+        if (changeParam.isChangeRequired()) {
+            boolean required = Boolean.TRUE.equals(rightParam.getRequired());
+            li.withText(" change into " + (required ? "required" : "not required"));
         }
-        if (changeDescription) {
-            li.withText(" Notes ").with(del(leftParam.getDescription()).withClass("comment")).withText(" change into ").with(span(span(null == rightParam.getDescription() ? "" : rightParam.getDescription()).withClass("comment")));
+        if (changeParam.isChangeDescription()) {
+            li.withText(" Notes ")
+              .with(del(leftParam.getDescription()).withClass("comment"))
+              .withText(" change into ")
+              .with(span(span(null == rightParam.getDescription() ? "" : rightParam.getDescription()).withClass("comment")));
         }
         return li;
     }
 
     private ContainerTag ul_produce(ChangedOperation changedOperation) {
-        List<String> addProduce = changedOperation.getAddProduces();
-        List<String> delProduce = changedOperation.getMissingProduces();
         ContainerTag ul = ul().withClass("change produces");
-        for (String mt : addProduce) {
-            ul.with(li_addMediaType(mt));
-        }
-        for (String mt : delProduce) {
-            ul.with(li_missingMediaType(mt));
-        }
+        for (String mt : changedOperation.getAddProduces()) ul.with(li_addMediaType(mt));
+        for (String mt : changedOperation.getMissingProduces()) ul.with(li_missingMediaType(mt));
         return ul;
     }
 
     private ContainerTag ul_consume(ChangedOperation changedOperation) {
-        List<String> addConsume = changedOperation.getAddConsumes();
-        List<String> delConsume = changedOperation.getMissingConsumes();
         ContainerTag ul = ul().withClass("change consumes");
-        for (String mt : addConsume) {
-            ul.with(li_addMediaType(mt));
-        }
-        for (String mt : delConsume) {
-            ul.with(li_missingMediaType(mt));
-        }
+        for (String mt : changedOperation.getAddConsumes()) ul.with(li_addMediaType(mt));
+        for (String mt : changedOperation.getMissingConsumes()) ul.with(li_missingMediaType(mt));
         return ul;
     }
 
@@ -277,5 +242,58 @@ public class HtmlRender implements Render {
 
     private ContainerTag li_addMediaType(String type) {
         return li().withText("Add " + type).with(span(""));
+    }
+
+    private boolean isDiffResponses(ChangedOperation op) {
+    return !op.getAddResponses().isEmpty()
+            || !op.getMissingResponses().isEmpty()
+            || !op.getChangedResponses().isEmpty();
+}
+
+    @SuppressWarnings("rawtypes")
+    private ContainerTag ul_responses(ChangedOperation op) {
+        ContainerTag ul = ul().withClass("change responses");
+
+        // status aggiunti
+        for (Map.Entry<String, io.swagger.v3.oas.models.responses.ApiResponse> e : op.getAddResponses().entrySet()) {
+            String desc = e.getValue() != null ? e.getValue().getDescription() : null;
+            ul.with(li().withText("Add response " + e.getKey())
+                    .with(span(null == desc ? "" : "//" + desc).withClass("comment")));
+        }
+
+        // status rimossi
+        for (Map.Entry<String, io.swagger.v3.oas.models.responses.ApiResponse> e : op.getMissingResponses().entrySet()) {
+            String desc = e.getValue() != null ? e.getValue().getDescription() : null;
+            ul.with(li().withClass("missing").withText("Delete response ").with(del(e.getKey()))
+                    .with(span(null == desc ? "" : "//" + desc).withClass("comment")));
+        }
+
+        // status modificati
+        for (ChangedResponse cr : op.getChangedResponses()) {
+            ContainerTag sub = ul().withClass("change response-detail");
+
+            if (cr.isDescriptionChanged()) {
+                sub.with(li().withText("Description ")
+                        .with(del(cr.getOldDescription() == null ? "" : cr.getOldDescription()).withClass("comment"))
+                        .withText(" change into ")
+                        .with(span(cr.getNewDescription() == null ? "" : cr.getNewDescription()).withClass("comment")));
+            }
+            for (ElProperty p : cr.getAddProps()) sub.with(li_addProp(p));
+            for (ElProperty p : cr.getMissingProps()) sub.with(li_missingProp(p));
+            for (ElProperty p : cr.getChangedProps()) sub.with(li_changedProp(p));
+
+            for (String ct : cr.getAddContentTypes()) sub.with(li().withText("Add content-type " + ct));
+            for (String ct : cr.getMissingContentTypes())
+                sub.with(li().withClass("missing").withText("Delete content-type ").with(del(ct)));
+
+            for (String h : cr.getAddHeaders().keySet()) sub.with(li().withText("Add header " + h));
+            for (String h : cr.getMissingHeaders().keySet())
+                sub.with(li().withClass("missing").withText("Delete header ").with(del(h)));
+            for (String h : cr.getChangedHeaders()) sub.with(li().withText("Change header " + h));
+
+            ul.with(li().withText("Response " + cr.getStatusCode()).with(sub));
+        }
+
+        return ul;
     }
 }

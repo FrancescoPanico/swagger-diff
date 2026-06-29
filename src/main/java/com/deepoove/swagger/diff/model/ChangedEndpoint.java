@@ -2,39 +2,39 @@ package com.deepoove.swagger.diff.model;
 
 import java.util.Map;
 
-import io.swagger.models.HttpMethod;
-import io.swagger.models.Operation;
+import io.swagger.v3.oas.models.Operation;
+import io.swagger.v3.oas.models.PathItem;
 
 public class ChangedEndpoint implements Changed {
 
     private String pathUrl;
 
-    private Map<HttpMethod, Operation> newOperations;
-    private Map<HttpMethod, Operation> missingOperations;
+    private Map<PathItem.HttpMethod, Operation> newOperations;
+    private Map<PathItem.HttpMethod, Operation> missingOperations;
 
-    private Map<HttpMethod, ChangedOperation> changedOperations;
+    private Map<PathItem.HttpMethod, ChangedOperation> changedOperations;
 
-    public Map<HttpMethod, Operation> getNewOperations() {
+    public Map<PathItem.HttpMethod, Operation> getNewOperations() {
         return newOperations;
     }
 
-    public void setNewOperations(Map<HttpMethod, Operation> newOperations) {
+    public void setNewOperations(Map<PathItem.HttpMethod, Operation> newOperations) {
         this.newOperations = newOperations;
     }
 
-    public Map<HttpMethod, Operation> getMissingOperations() {
+    public Map<PathItem.HttpMethod, Operation> getMissingOperations() {
         return missingOperations;
     }
 
-    public void setMissingOperations(Map<HttpMethod, Operation> missingOperations) {
+    public void setMissingOperations(Map<PathItem.HttpMethod, Operation> missingOperations) {
         this.missingOperations = missingOperations;
     }
 
-    public Map<HttpMethod, ChangedOperation> getChangedOperations() {
+    public Map<PathItem.HttpMethod, ChangedOperation> getChangedOperations() {
         return changedOperations;
     }
 
-    public void setChangedOperations(Map<HttpMethod, ChangedOperation> changedOperations) {
+    public void setChangedOperations(Map<PathItem.HttpMethod, ChangedOperation> changedOperations) {
         this.changedOperations = changedOperations;
     }
 
@@ -47,9 +47,6 @@ public class ChangedEndpoint implements Changed {
     }
 
     public boolean isDiff() {
-        // newOperations.isEmpty()
-        // || !missingOperations.isEmpty()
-        // ||
         return !changedOperations.isEmpty();
     }
 

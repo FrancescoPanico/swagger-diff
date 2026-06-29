@@ -1,10 +1,10 @@
 package com.deepoove.swagger.diff.model;
 
-import io.swagger.models.properties.Property;
+import io.swagger.v3.oas.models.media.Schema;
 
 /**
  * property with expression Language grammar
- * 
+ *
  * @author Sayi
  * @version
  */
@@ -12,18 +12,18 @@ public class ElProperty {
 
     private String el;
 
-    private Property property;
+    private Schema<?> property;
 
     // optional change metadata
     private boolean isTypeChange;
     private boolean newEnums;
     private boolean removedEnums;
 
-    public Property getProperty() {
+    public Schema<?> getProperty() {
         return property;
     }
 
-    public void setProperty(Property property) {
+    public void setProperty(Schema<?> property) {
         this.property = property;
     }
 

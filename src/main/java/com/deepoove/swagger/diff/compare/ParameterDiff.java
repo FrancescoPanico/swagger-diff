@@ -1,6 +1,7 @@
 package com.deepoove.swagger.diff.compare;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -10,38 +11,35 @@ import com.deepoove.swagger.diff.model.ChangedParameter;
 import com.deepoove.swagger.diff.model.ElProperty;
 import com.google.common.collect.Lists;
 
-import io.swagger.models.Model;
-import io.swagger.models.parameters.AbstractSerializableParameter;
-import io.swagger.models.parameters.BodyParameter;
-import io.swagger.models.parameters.Parameter;
-import io.swagger.models.properties.Property;
-import io.swagger.models.properties.StringProperty;
+import io.swagger.v3.oas.models.media.Schema;
+import io.swagger.v3.oas.models.parameters.Parameter;
 
 /**
- * compare two parameter
+ * Compare two lists of OAS3 parameters (path/query/header/cookie only;
+ * request body is handled separately in SpecificationDiff).
  *
- * @author Sayi
- * @version
+ * @author Sayi (adapted for OAS3)
  */
+@SuppressWarnings({"rawtypes"})
 public class ParameterDiff {
 
     private List<Parameter> increased;
     private List<Parameter> missing;
     private List<ChangedParameter> changed;
 
-    Map<String, Model> oldDedinitions;
-    Map<String, Model> newDedinitions;
+    Map<String, Schema> oldDefinitions;
+    Map<String, Schema> newDefinitions;
 
     private ParameterDiff() {
-        this.increased = new ArrayList<Parameter>();
-        this.missing = new ArrayList<Parameter>();
-        this.changed = new ArrayList<ChangedParameter>();
+        this.increased = new ArrayList<>();
+        this.missing = new ArrayList<>();
+        this.changed = new ArrayList<>();
     }
 
-    public static ParameterDiff buildWithDefinition(Map<String, Model> left, Map<String, Model> right) {
+    public static ParameterDiff buildWithDefinition(Map<String, Schema> left, Map<String, Schema> right) {
         ParameterDiff diff = new ParameterDiff();
-        diff.oldDedinitions = left;
-        diff.newDedinitions = right;
+        diff.oldDefinitions = left != null ? left : new HashMap<>();
+        diff.newDefinitions = right != null ? right : new HashMap<>();
         return diff;
     }
 
@@ -51,97 +49,59 @@ public class ParameterDiff {
 
         ListDiff<Parameter> paramDiff = ListDiff.diff(left, right, (t, param) -> {
             for (Parameter para : t) {
-                if (param.getName().equals(para.getName())) { return para; }
+                if (param.getName() != null && param.getName().equals(para.getName())) return para;
             }
             return null;
         });
         this.increased.addAll(paramDiff.getIncreased());
         this.missing.addAll(paramDiff.getMissing());
+
         Map<Parameter, Parameter> shared = paramDiff.getShared();
         shared.forEach((leftPara, rightPara) -> {
             ChangedParameter changedParameter = new ChangedParameter();
             changedParameter.setLeftParameter(leftPara);
             changedParameter.setRightParameter(rightPara);
-            if (leftPara instanceof BodyParameter && rightPara instanceof BodyParameter) {
-                BodyParameter leftBodyPara = (BodyParameter) leftPara;
-                Model leftSchema = leftBodyPara.getSchema();
-                BodyParameter rightBodyPara = (BodyParameter) rightPara;
-                Model rightSchema = rightBodyPara.getSchema();
 
-                ModelDiff diff = ModelDiff.buildWithDefinition(oldDedinitions, newDedinitions).diff(leftSchema,
-                        rightSchema, leftPara.getName());
-                changedParameter.setIncreased(diff.getIncreased());
-                changedParameter.setMissing(diff.getMissing());
-                changedParameter.setChanged(diff.getChanged());
-
-            }
-
-            // Let's handle the case where the new API has fx changed the type
-            // of PathParameter from being of type String to type integer
-            if (leftPara instanceof AbstractSerializableParameter
-                    && rightPara instanceof AbstractSerializableParameter) {
-                if (!leftPara.equals(rightPara)) {
+            // Compare schema type changes (replaces AbstractSerializableParameter check)
+            Schema leftSchema = leftPara.getSchema();
+            Schema rightSchema = rightPara.getSchema();
+            if (leftSchema != null && rightSchema != null) {
+                String leftType = leftSchema.getType();
+                String rightType = rightSchema.getType();
+                if (leftType != null && !leftType.equals(rightType)) {
                     ElProperty elProperty = new ElProperty();
                     elProperty.setEl(rightPara.getName());
-                    elProperty.setProperty(mapToProperty(rightPara));
+                    elProperty.setProperty(rightSchema);
                     changedParameter.setChanged(Lists.newArrayList(elProperty));
                 }
             }
 
-            // is requried
-            boolean rightRequired = rightPara.getRequired();
-            boolean leftRequired = leftPara.getRequired();
+            // required
+            boolean rightRequired = Boolean.TRUE.equals(rightPara.getRequired());
+            boolean leftRequired = Boolean.TRUE.equals(leftPara.getRequired());
             changedParameter.setChangeRequired(leftRequired != rightRequired);
 
             // description
             String description = rightPara.getDescription();
-            String oldPescription = leftPara.getDescription();
+            String oldDescription = leftPara.getDescription();
             if (StringUtils.isBlank(description)) description = "";
-            if (StringUtils.isBlank(oldPescription)) oldPescription = "";
-            changedParameter.setChangeDescription(!description.equals(oldPescription));
+            if (StringUtils.isBlank(oldDescription)) oldDescription = "";
+            changedParameter.setChangeDescription(!description.equals(oldDescription));
 
             if (changedParameter.isDiff()) {
                 this.changed.add(changedParameter);
             }
-
         });
 
         return this;
     }
 
-    private Property mapToProperty(Parameter rightPara) {
-        Property prop = new StringProperty();
-        prop.setAccess(rightPara.getAccess());
-        prop.setAllowEmptyValue(rightPara.getAllowEmptyValue());
-        prop.setDescription(rightPara.getDescription());
-        prop.setName(rightPara.getName());
-        prop.setReadOnly(rightPara.isReadOnly());
-        prop.setRequired(rightPara.getRequired());
-        return prop;
-    }
+    public List<Parameter> getIncreased() { return increased; }
+    public void setIncreased(List<Parameter> increased) { this.increased = increased; }
 
-    public List<Parameter> getIncreased() {
-        return increased;
-    }
+    public List<Parameter> getMissing() { return missing; }
+    public void setMissing(List<Parameter> missing) { this.missing = missing; }
 
-    public void setIncreased(List<Parameter> increased) {
-        this.increased = increased;
-    }
-
-    public List<Parameter> getMissing() {
-        return missing;
-    }
-
-    public void setMissing(List<Parameter> missing) {
-        this.missing = missing;
-    }
-
-    public List<ChangedParameter> getChanged() {
-        return changed;
-    }
-
-    public void setChanged(List<ChangedParameter> changed) {
-        this.changed = changed;
-    }
-
+    public List<ChangedParameter> getChanged() { return changed; }
+    public void setChanged(List<ChangedParameter> changed) { this.changed = changed; }
 }

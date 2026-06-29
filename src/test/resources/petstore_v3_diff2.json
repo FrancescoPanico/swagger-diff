@@ -1,0 +1,81 @@
+{
+  "openapi": "3.0.1",
+  "info": { "title": "API", "version": "1.1" },
+  "paths": {
+    "/item": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name", "age", "size"],
+                "properties": {
+                  "name": { "type": "string", "description": "name of item" },
+                  "age": { "type": "integer", "description": "age of item" },
+                  "size": { "type": "integer", "deprecated": true }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+          "description": "update Success",
+          "headers": {
+            "X-Rate-Limit": { "description": "max calls per hour", "schema": { "type": "string" } },
+            "X-New-Header": { "schema": { "type": "string" } }
+          },
+          "content": {
+            "application/json": { "schema": { "type": "object", "properties": { "id": { "type": "string" } } } },
+            "application/xml": { "schema": { "type": "object" } }
+          }
+},
+          "201": { "description": "created" },
+          "400": { "description": "bad request", "content": { "application/json": { "schema": { "type": "string", "deprecated": true } } } }
+        }
+      },
+      "get": {
+        "parameters": [
+          { "name": "type", "in": "query", "schema": { "type": "string", "description": "the type of the item" } },
+          { "name": "size", "in": "query", "required": true,  "description": "the size of the item", "schema": { "type": "integer"} } 
+        ],
+        "responses": {
+          "200": { "description": "ok" }
+        }
+      }
+    },
+    "/admin/item": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string", "description": "name of item" },
+                  "age": { "type": "integer", "description": "age of item" },
+                  "size": { "type": "integer", "deprecated": true }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "ok" },
+          "201": { "description": "created" },
+          "400": { "description": "bad request", "content": { "application/json": { "schema": { "type": "string", "deprecated": true } } } }
+        }
+      },
+      "get": {
+        "parameters": [
+          { "name": "type", "in": "query", "schema": { "type": "string", "description": "the type of the item" } },
+          { "name": "size", "in": "query", "required": true,  "description": "the size of the item", "schema": { "type": "integer"} } 
+        ],
+        "responses": {
+          "200": { "description": "ok" }
+        }
+      }
+    }
+  }
+}
