@@ -36,7 +36,7 @@ java -jar swagger-diff.jar \
 Download the fatJar or view the changelog on the **[Release Page](https://github.com/Sayi/swagger-diff/releases),** and thanks to all contributors.
 
 ## Feature
-* Supports swagger spec v1.x and v2.0.
+* Supports swagger spec v1.x v2.0 and openAPI 3.0.x
 * Depth comparison of parameters, responses, notes, http method(GET,POST,PUT,DELETE...)
 * Supports swagger api Authorization
 * Render difference of property with Expression Language
@@ -54,7 +54,7 @@ Download the fatJar or view the changelog on the **[Release Page](https://github
 
 ## Gradle
 ```shell
-compile group: 'com.deepoove', name: 'swagger-diff', version: '1.2.2'
+compile group: 'com.deepoove', name: 'swagger-diff', version: '1.3.0'
 ```
 
 ## Usage
