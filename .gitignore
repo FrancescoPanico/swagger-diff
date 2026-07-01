@@ -22,3 +22,7 @@ testDiff.md
 testDeprecatedApi.html
 testNewApi.html
 
+
+.vscode/
+
+.DS_Store

@@ -3,7 +3,7 @@ package com.deepoove.swagger.diff.model;
 import java.util.ArrayList;
 import java.util.List;
 
-import io.swagger.models.parameters.Parameter;
+import io.swagger.v3.oas.models.parameters.Parameter;
 
 public class ChangedParameter implements Changed {
 
@@ -15,7 +15,6 @@ public class ChangedParameter implements Changed {
     private Parameter rightParameter;
 
     private boolean isChangeRequired;
-    // private boolean isChangeType;
     private boolean isChangeDescription;
 
     public boolean isChangeRequired() {

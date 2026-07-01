@@ -7,9 +7,9 @@ import java.util.Map.Entry;
 import com.deepoove.swagger.diff.SwaggerDiff;
 import com.deepoove.swagger.diff.model.*;
 
-import io.swagger.models.HttpMethod;
-import io.swagger.models.parameters.Parameter;
-import io.swagger.models.properties.Property;
+import io.swagger.v3.oas.models.PathItem;
+import io.swagger.v3.oas.models.media.Schema;
+import io.swagger.v3.oas.models.parameters.Parameter;
 
 public class MarkdownRender implements Render {
 
@@ -25,259 +25,216 @@ public class MarkdownRender implements Render {
     public MarkdownRender() {}
 
     public String render(SwaggerDiff diff) {
-        List<Endpoint> newEndpoints = diff.getNewEndpoints();
-        String ol_newEndpoint = ol_newEndpoint(newEndpoints);
-
-        List<Endpoint> missingEndpoints = diff.getMissingEndpoints();
-        String ol_missingEndpoint = ol_missingEndpoint(missingEndpoints);
-
-        List<ChangedEndpoint> changedEndpoints = diff.getChangedEndpoints();
-        String ol_changed = ol_changed(changedEndpoints);
-
-        return renderHtml(diff.getOldVersion(), diff.getNewVersion(), ol_newEndpoint, ol_missingEndpoint, ol_changed);
+        String ol_new = ol_newEndpoint(diff.getNewEndpoints());
+        String ol_miss = ol_missingEndpoint(diff.getMissingEndpoints());
+        String ol_changed = ol_changed(diff.getChangedEndpoints());
+        return renderHtml(diff.getOldVersion(), diff.getNewVersion(), ol_new, ol_miss, ol_changed);
     }
 
-    public String renderHtml(String oldVersion, String newVersion, String ol_new, String ol_miss,
-                             String ol_changed) {
-        StringBuffer sb = new StringBuffer();
-        sb.append(H2).append("Version " + oldVersion + " to " + newVersion).append("\n").append(HR);
-        sb.append(H3).append("What's New").append("\n").append(HR)
-                .append(ol_new).append("\n").append(H3)
-                .append("What's Deprecated").append("\n").append(HR)
-                .append(ol_miss).append("\n").append(H3)
-                .append("What's Changed").append("\n").append(HR)
-                .append(ol_changed);
-        return sb.toString();
+    public String renderHtml(String oldVersion, String newVersion, String ol_new,
+                             String ol_miss, String ol_changed) {
+        return new StringBuilder()
+            .append(H2).append("Version ").append(oldVersion).append(" to ").append(newVersion).append("\n").append(HR)
+            .append(H3).append("What's New").append("\n").append(HR).append(ol_new).append("\n")
+            .append(H3).append("What's Deprecated").append("\n").append(HR).append(ol_miss).append("\n")
+            .append(H3).append("What's Changed").append("\n").append(HR).append(ol_changed)
+            .toString();
     }
 
     private String ol_newEndpoint(List<Endpoint> endpoints) {
         if (null == endpoints) return "";
-        StringBuffer sb = new StringBuffer();
-        for (Endpoint endpoint : endpoints) {
-            sb.append(li_newEndpoint(endpoint.getMethod().toString(),
-                    endpoint.getPathUrl(), endpoint.getSummary()));
+        StringBuilder sb = new StringBuilder();
+        for (Endpoint e : endpoints) {
+            sb.append(li_newEndpoint(e.getMethod().name(), e.getPathUrl(), e.getSummary()));
         }
         return sb.toString();
     }
 
     private String li_newEndpoint(String method, String path, String desc) {
-        StringBuffer sb = new StringBuffer();
-        sb.append(LI).append(CODE).append(method).append(CODE)
-                .append(" " + path).append(" " + desc + "\n");
-        return sb.toString();
+        return LI + CODE + method + CODE + " " + path + " " + (desc != null ? desc : "") + "\n";
     }
 
     private String ol_missingEndpoint(List<Endpoint> endpoints) {
         if (null == endpoints) return "";
-        StringBuffer sb = new StringBuffer();
-        for (Endpoint endpoint : endpoints) {
-            sb.append(li_newEndpoint(endpoint.getMethod().toString(),
-                    endpoint.getPathUrl(), endpoint.getSummary()));
+        StringBuilder sb = new StringBuilder();
+        for (Endpoint e : endpoints) {
+            sb.append(li_newEndpoint(e.getMethod().name(), e.getPathUrl(), e.getSummary()));
         }
         return sb.toString();
     }
 
     private String ol_changed(List<ChangedEndpoint> changedEndpoints) {
         if (null == changedEndpoints) return "";
-        StringBuffer sb = new StringBuffer();
+        StringBuilder sb = new StringBuilder();
         for (ChangedEndpoint changedEndpoint : changedEndpoints) {
             String pathUrl = changedEndpoint.getPathUrl();
-            Map<HttpMethod, ChangedOperation> changedOperations = changedEndpoint
-                    .getChangedOperations();
-            for (Entry<HttpMethod, ChangedOperation> entry : changedOperations
-                    .entrySet()) {
-                String method = entry.getKey().toString();
-                ChangedOperation changedOperation = entry.getValue();
-                String desc = changedOperation.getSummary();
-
-                StringBuffer ul_detail = new StringBuffer();
-                if (changedOperation.isDiffParam()) {
-                    ul_detail.append(PRE_LI).append("Parameters")
-                            .append(ul_param(changedOperation));
-                }
-                if (changedOperation.isDiffProp()) {
-                    ul_detail.append(PRE_LI).append("Return Type")
-                            .append(ul_response(changedOperation));
-                }
-                if (changedOperation.isDiffProduces()) {
-                    ul_detail.append(PRE_LI).append("Produces")
-                            .append(ul_produce(changedOperation));
-                }
-                if (changedOperation.isDiffConsumes()) {
-                    ul_detail.append(PRE_LI).append("Consumes")
-                            .append(ul_consume(changedOperation));
-                }
-                sb.append(CODE).append(method).append(CODE)
-                        .append(" " + pathUrl).append(" " + desc + "  \n")
-                        .append(ul_detail);
+            Map<PathItem.HttpMethod, ChangedOperation> changedOps = changedEndpoint.getChangedOperations();
+            for (Entry<PathItem.HttpMethod, ChangedOperation> entry : changedOps.entrySet()) {
+                String method = entry.getKey().name();
+                ChangedOperation op = entry.getValue();
+                StringBuilder detail = new StringBuilder();
+                if (op.isDiffParam()) detail.append(PRE_LI).append("Parameters").append(ul_param(op));
+                if (op.isDiffProp()) detail.append(PRE_LI).append("Return Type").append(ul_response(op));
+                if (op.isDiffProduces()) detail.append(PRE_LI).append("Produces").append(ul_produce(op));
+                if (op.isDiffConsumes()) detail.append(PRE_LI).append("Consumes").append(ul_consume(op));
+                if (isDiffResponses(op)) detail.append(PRE_LI).append("Responses").append(ul_responses(op));
+                sb.append(CODE).append(method).append(CODE).append(" ").append(pathUrl)
+                  .append(" ").append(op.getSummary() != null ? op.getSummary() : "").append("  \n")
+                  .append(detail);
             }
         }
         return sb.toString();
     }
 
-    private String ul_response(ChangedOperation changedOperation) {
-        List<ElProperty> addProps = changedOperation.getAddProps();
-        List<ElProperty> delProps = changedOperation.getMissingProps();
-        List<ElProperty> changedProps = changedOperation.getChangedProps();
-        StringBuffer sb = new StringBuffer("\n\n");
-
-        String prefix = PRE_LI + PRE_CODE;
-        for (ElProperty prop : addProps) {
-            sb.append(PRE_LI).append(PRE_CODE).append(li_addProp(prop) + "\n");
-        }
-        for (ElProperty prop : delProps) {
-            sb.append(prefix).append(li_missingProp(prop) + "\n");
-        }
-        for (ElProperty prop : changedProps) {
-            sb.append(prefix).append(li_changedProp(prop) + "\n");
-        }
+    @SuppressWarnings("rawtypes")
+    private String ul_response(ChangedOperation op) {
+        StringBuilder sb = new StringBuilder("\n\n");
+        for (ElProperty p : op.getAddProps()) sb.append(PRE_LI).append(PRE_CODE).append(li_addProp(p)).append("\n");
+        for (ElProperty p : op.getMissingProps()) sb.append(PRE_LI).append(PRE_CODE).append(li_missingProp(p)).append("\n");
+        for (ElProperty p : op.getChangedProps()) sb.append(PRE_LI).append(PRE_CODE).append(li_changedProp(p)).append("\n");
         return sb.toString();
     }
 
+    @SuppressWarnings("rawtypes")
     private String li_missingProp(ElProperty prop) {
-        Property property = prop.getProperty();
-        StringBuffer sb = new StringBuffer("");
-        sb.append("Delete ").append(prop.getEl())
-                .append(null == property.getDescription() ? ""
-                        : (" //" + property.getDescription()));
-        return sb.toString();
+        Schema schema = prop.getProperty();
+        String desc = schema != null ? schema.getDescription() : null;
+        return "Delete " + prop.getEl() + (null == desc ? "" : " //" + desc);
     }
 
+    @SuppressWarnings("rawtypes")
     private String li_addProp(ElProperty prop) {
-        Property property = prop.getProperty();
-        StringBuffer sb = new StringBuffer("");
-        sb.append("Insert ").append(prop.getEl())
-                .append(null == property.getDescription() ? ""
-                        : (" //" + property.getDescription()));
-        return sb.toString();
+        Schema schema = prop.getProperty();
+        String desc = schema != null ? schema.getDescription() : null;
+        return "Insert " + prop.getEl() + (null == desc ? "" : " //" + desc);
     }
 
+    @SuppressWarnings("rawtypes")
     private String li_changedProp(ElProperty prop) {
-        Property property = prop.getProperty();
-        String prefix = "Modify ";
-        String desc = " //" + property.getDescription();
-        String postfix = (null == property.getDescription() ? "" : desc);
-
-        StringBuffer sb = new StringBuffer("");
-        sb.append(prefix).append(prop.getEl())
-                .append(postfix);
-        return sb.toString();
+        Schema schema = prop.getProperty();
+        String desc = schema != null ? schema.getDescription() : null;
+        return "Modify " + prop.getEl() + (null == desc ? "" : " //" + desc);
     }
 
-    private String ul_param(ChangedOperation changedOperation) {
-        List<Parameter> addParameters = changedOperation.getAddParameters();
-        List<Parameter> delParameters = changedOperation.getMissingParameters();
-        List<ChangedParameter> changedParameters = changedOperation
-                .getChangedParameter();
-        StringBuffer sb = new StringBuffer("\n\n");
-        for (Parameter param : addParameters) {
-            sb.append(PRE_LI).append(PRE_CODE)
-                    .append(li_addParam(param) + "\n");
+    private String ul_param(ChangedOperation op) {
+        StringBuilder sb = new StringBuilder("\n\n");
+        for (Parameter p : op.getAddParameters()) sb.append(PRE_LI).append(PRE_CODE).append(li_addParam(p)).append("\n");
+        for (ChangedParameter cp : op.getChangedParameter()) {
+            for (ElProperty prop : cp.getIncreased()) sb.append(PRE_LI).append(PRE_CODE).append(li_addProp(prop)).append("\n");
         }
-        for (ChangedParameter param : changedParameters) {
-            List<ElProperty> increased = param.getIncreased();
-            for (ElProperty prop : increased) {
-                sb.append(PRE_LI).append(PRE_CODE)
-                        .append(li_addProp(prop) + "\n");
+        for (ChangedParameter cp : op.getChangedParameter()) {
+            if (cp.isChangeRequired() || cp.isChangeDescription()) {
+                sb.append(PRE_LI).append(PRE_CODE).append(li_changedParam(cp)).append("\n");
             }
         }
-        for (ChangedParameter param : changedParameters) {
-            boolean changeRequired = param.isChangeRequired();
-            boolean changeDescription = param.isChangeDescription();
-            if (changeRequired || changeDescription) sb.append(PRE_LI)
-                    .append(PRE_CODE).append(li_changedParam(param) + "\n");
+        for (ChangedParameter cp : op.getChangedParameter()) {
+            for (ElProperty prop : cp.getMissing()) sb.append(PRE_LI).append(PRE_CODE).append(li_missingProp(prop)).append("\n");
+            for (ElProperty prop : cp.getChanged()) sb.append(PRE_LI).append(PRE_CODE).append(li_changedProp(prop)).append("\n");
         }
-        for (ChangedParameter param : changedParameters) {
-            List<ElProperty> missing = param.getMissing();
-            List<ElProperty> changed = param.getChanged();
-            for (ElProperty prop : missing) {
-                sb.append(PRE_LI).append(PRE_CODE)
-                        .append(li_missingProp(prop) + "\n");
-            }
-            for (ElProperty prop : changed) {
-                sb.append(PRE_LI).append(PRE_CODE)
-                        .append(li_changedProp(prop) + "\n");
-            }
-        }
-        for (Parameter param : delParameters) {
-            sb.append(PRE_LI).append(PRE_CODE)
-                    .append(li_missingParam(param) + "\n");
-        }
+        for (Parameter p : op.getMissingParameters()) sb.append(PRE_LI).append(PRE_CODE).append(li_missingParam(p)).append("\n");
         return sb.toString();
     }
 
     private String li_addParam(Parameter param) {
-        StringBuffer sb = new StringBuffer("");
-        sb.append("Add ").append(param.getName())
-                .append(null == param.getDescription() ? ""
-                        : (" //" + param.getDescription()));
-        return sb.toString();
+        return "Add " + param.getName() + (null == param.getDescription() ? "" : " //" + param.getDescription());
     }
 
     private String li_missingParam(Parameter param) {
-        StringBuffer sb = new StringBuffer("");
-        sb.append("Delete ").append(param.getName())
-                .append(null == param.getDescription() ? ""
-                        : (" //" + param.getDescription()));
-        return sb.toString();
+        return "Delete " + param.getName() + (null == param.getDescription() ? "" : " //" + param.getDescription());
     }
 
-    private String li_changedParam(ChangedParameter changeParam) {
-        boolean changeRequired = changeParam.isChangeRequired();
-        boolean changeDescription = changeParam.isChangeDescription();
-        Parameter rightParam = changeParam.getRightParameter();
-        Parameter leftParam = changeParam.getLeftParameter();
-        StringBuffer sb = new StringBuffer("");
-        sb.append(rightParam.getName());
-        if (changeRequired) {
-            sb.append(" change into " + (rightParam.getRequired() ? "required" : "not required"));
+    private String li_changedParam(ChangedParameter cp) {
+        Parameter right = cp.getRightParameter();
+        Parameter left = cp.getLeftParameter();
+        StringBuilder sb = new StringBuilder(right.getName());
+        if (cp.isChangeRequired()) {
+            sb.append(" change into ").append(Boolean.TRUE.equals(right.getRequired()) ? "required" : "not required");
         }
-        if (changeDescription) {
-            sb.append(" Notes ").append(leftParam.getDescription()).append(" change into ")
-                    .append(rightParam.getDescription());
+        if (cp.isChangeDescription()) {
+            sb.append(" Notes ").append(left.getDescription()).append(" change into ").append(right.getDescription());
         }
         return sb.toString();
     }
 
-    private String ul_produce(ChangedOperation changedOperation) {
-        List<String> addProduce = changedOperation.getAddProduces();
-        List<String> delProduce = changedOperation.getMissingProduces();
-        StringBuffer sb = new StringBuffer("\n\n");
-
-        String prefix = PRE_LI + PRE_CODE;
-        for (String mt : addProduce) {
-            sb.append(PRE_LI).append(PRE_CODE).append(li_addMediaType(mt) + "\n");
-        }
-        for (String mt : delProduce) {
-            sb.append(prefix).append(li_missingMediaType(mt) + "\n");
-        }
+    private String ul_produce(ChangedOperation op) {
+        StringBuilder sb = new StringBuilder("\n\n");
+        for (String mt : op.getAddProduces()) sb.append(PRE_LI).append(PRE_CODE).append("Insert ").append(mt).append("\n");
+        for (String mt : op.getMissingProduces()) sb.append(PRE_LI).append(PRE_CODE).append("Delete ").append(mt).append("\n");
         return sb.toString();
     }
 
-    private String ul_consume(ChangedOperation changedOperation) {
-        List<String> addConsume = changedOperation.getAddConsumes();
-        List<String> delConsume = changedOperation.getMissingConsumes();
-        StringBuffer sb = new StringBuffer("\n\n");
-
-        String prefix = PRE_LI + PRE_CODE;
-        for (String mt : addConsume) {
-            sb.append(PRE_LI).append(PRE_CODE).append(li_addMediaType(mt) + "\n");
-        }
-        for (String mt : delConsume) {
-            sb.append(prefix).append(li_missingMediaType(mt) + "\n");
-        }
+    private String ul_consume(ChangedOperation op) {
+        StringBuilder sb = new StringBuilder("\n\n");
+        for (String mt : op.getAddConsumes()) sb.append(PRE_LI).append(PRE_CODE).append("Insert ").append(mt).append("\n");
+        for (String mt : op.getMissingConsumes()) sb.append(PRE_LI).append(PRE_CODE).append("Delete ").append(mt).append("\n");
         return sb.toString();
     }
 
-    private String li_missingMediaType(String type) {
-        StringBuffer sb = new StringBuffer("");
-        sb.append("Delete ").append(type);
-        return sb.toString();
+    private boolean isDiffResponses(ChangedOperation op) {
+        return !op.getAddResponses().isEmpty()
+                || !op.getMissingResponses().isEmpty()
+                || !op.getChangedResponses().isEmpty();
     }
 
-    private String li_addMediaType(String type) {
-        StringBuffer sb = new StringBuffer("");
-        sb.append("Insert ").append(type);
+    private String ul_responses(ChangedOperation op) {
+        StringBuilder sb = new StringBuilder("\n\n");
+
+        // status aggiunti
+        for (Map.Entry<String, io.swagger.v3.oas.models.responses.ApiResponse> e : op.getAddResponses().entrySet()) {
+            String desc = e.getValue() != null ? e.getValue().getDescription() : null;
+            sb.append(PRE_LI).append(PRE_CODE)
+            .append("Insert response ").append(e.getKey())
+            .append(null == desc ? "" : " //" + desc)
+            .append("\n");
+        }
+
+        // status rimossi
+        for (Map.Entry<String, io.swagger.v3.oas.models.responses.ApiResponse> e : op.getMissingResponses().entrySet()) {
+            String desc = e.getValue() != null ? e.getValue().getDescription() : null;
+            sb.append(PRE_LI).append(PRE_CODE)
+            .append("Delete response ").append(e.getKey())
+            .append(null == desc ? "" : " //" + desc)
+            .append("\n");
+        }
+
+        // status modificati
+        for (ChangedResponse cr : op.getChangedResponses()) {
+            sb.append(PRE_LI).append(PRE_CODE)
+            .append("Modify response ").append(cr.getStatusCode()).append("\n");
+
+            // description
+            if (cr.isDescriptionChanged()) {
+                sb.append(PRE_LI).append(PRE_CODE).append(PRE_CODE)
+                .append("Description ")
+                .append(cr.getOldDescription() != null ? cr.getOldDescription() : "")
+                .append(" change into ")
+                .append(cr.getNewDescription() != null ? cr.getNewDescription() : "")
+                .append("\n");
+            }
+
+            // schema (proprietà)
+            for (ElProperty p : cr.getAddProps())
+                sb.append(PRE_LI).append(PRE_CODE).append(PRE_CODE).append(li_addProp(p)).append("\n");
+            for (ElProperty p : cr.getMissingProps())
+                sb.append(PRE_LI).append(PRE_CODE).append(PRE_CODE).append(li_missingProp(p)).append("\n");
+            for (ElProperty p : cr.getChangedProps())
+                sb.append(PRE_LI).append(PRE_CODE).append(PRE_CODE).append(li_changedProp(p)).append("\n");
+
+            // content-type
+            for (String ct : cr.getAddContentTypes())
+                sb.append(PRE_LI).append(PRE_CODE).append(PRE_CODE).append("Insert content-type ").append(ct).append("\n");
+            for (String ct : cr.getMissingContentTypes())
+                sb.append(PRE_LI).append(PRE_CODE).append(PRE_CODE).append("Delete content-type ").append(ct).append("\n");
+
+            // headers
+            for (String h : cr.getAddHeaders().keySet())
+                sb.append(PRE_LI).append(PRE_CODE).append(PRE_CODE).append("Insert header ").append(h).append("\n");
+            for (String h : cr.getMissingHeaders().keySet())
+                sb.append(PRE_LI).append(PRE_CODE).append(PRE_CODE).append("Delete header ").append(h).append("\n");
+            for (String h : cr.getChangedHeaders())
+                sb.append(PRE_LI).append(PRE_CODE).append(PRE_CODE).append("Modify header ").append(h).append("\n");
+        }
+
         return sb.toString();
     }
 }

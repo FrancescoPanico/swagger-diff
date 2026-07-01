@@ -1,16 +1,15 @@
 package com.deepoove.swagger.diff.model;
 
-import io.swagger.models.HttpMethod;
-import io.swagger.models.Operation;
-import io.swagger.models.Path;
+import io.swagger.v3.oas.models.Operation;
+import io.swagger.v3.oas.models.PathItem;
 
 public class Endpoint {
 
     private String pathUrl;
-    private HttpMethod method;
+    private PathItem.HttpMethod method;
     private String summary;
 
-    private Path path;
+    private PathItem path;
     private Operation operation;
 
     public String getPathUrl() {
@@ -21,11 +20,11 @@ public class Endpoint {
         this.pathUrl = pathUrl;
     }
 
-    public HttpMethod getMethod() {
+    public PathItem.HttpMethod getMethod() {
         return method;
     }
 
-    public void setMethod(HttpMethod method) {
+    public void setMethod(PathItem.HttpMethod method) {
         this.method = method;
     }
 
@@ -37,11 +36,11 @@ public class Endpoint {
         this.summary = summary;
     }
 
-    public Path getPath() {
+    public PathItem getPath() {
         return path;
     }
 
-    public void setPath(Path path) {
+    public void setPath(PathItem path) {
         this.path = path;
     }
 

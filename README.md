@@ -2,7 +2,7 @@
 
 ![Build Status](https://travis-ci.org/Sayi/swagger-diff.svg?branch=master) ![jdk1.8+](https://img.shields.io/badge/jdk-1.8%2B-orange.svg) [![Coverage Status](https://coveralls.io/repos/github/Sayi/swagger-diff/badge.svg)](https://coveralls.io/github/Sayi/swagger-diff) [![Maven](https://maven-badges.herokuapp.com/maven-central/com.deepoove/swagger-diff/badge.svg?style=plastic)](https://maven-badges.herokuapp.com/maven-central/com.deepoove/swagger-diff)
 
-Compare two swagger API specifications(1.x or v2.0) and render the difference to html file or markdown file.
+Compare two swagger/openAPI API specifications(1.x or v2.0 or openAPI 3.0.x) and render the difference to html file or markdown file.
 
 ## :black_large_square: Command line interface (CLI) 
 
@@ -15,7 +15,7 @@ Usage: java -jar swagger-diff.jar [options]
   * -new
       new api-doc location:Json file path or Http url
     -v
-      swagger version:1.0 or 2.0
+      swagger version:1.0 or 2.0 or 3.0
       Default: 2.0
     -output-mode
       render mode: markdown or html
@@ -48,7 +48,7 @@ Download the fatJar or view the changelog on the **[Release Page](https://github
 <dependency>
   <groupId>com.deepoove</groupId>
   <artifactId>swagger-diff</artifactId>
-  <version>1.2.2</version>
+  <version>1.3.0</version>
 </dependency>
 ```
 
@@ -71,6 +71,11 @@ SwaggerDiff.compareV1("petstore_v1_1.json", "petstore_v1_2.json");
 v2.0
 ```java
 SwaggerDiff.compareV2("petstore_v2_1.json", "petstore_v2_2.json");
+```
+
+openAPI 3.0.x
+```java
+SwaggerDiff.compareV3("petstore_v3_1.json", "petstore_v3_2.json");
 ```
 
 ## Render difference
@@ -157,7 +162,3 @@ try {
 
 ## How it works
 ![image](./swagger-diff.png)
-
-
-
-

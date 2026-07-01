@@ -3,6 +3,7 @@ package com.deepoove.swagger.diff.compare;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -11,100 +12,148 @@ import java.util.Set;
 
 import com.deepoove.swagger.diff.model.ElProperty;
 
-import io.swagger.models.ArrayModel;
-import io.swagger.models.Model;
-import io.swagger.models.RefModel;
-import io.swagger.models.properties.ArrayProperty;
-import io.swagger.models.properties.Property;
-import io.swagger.models.properties.RefProperty;
-import io.swagger.models.properties.StringProperty;
+import io.swagger.v3.oas.models.media.Schema;
 
 /**
- * compare two model
- * 
- * @author Sayi
- * @version
+ * compare two OAS3 Schema (replaces Model + Property from Swagger 2.0)
+ *
+ * @author Sayi (adapted for OAS3)
  */
+@SuppressWarnings({"rawtypes", "unchecked"})
 public class ModelDiff {
 
     private List<ElProperty> increased;
     private List<ElProperty> missing;
     private List<ElProperty> changed;
 
-    Map<String, Model> oldDedinitions;
-    Map<String, Model> newDedinitions;
+    Map<String, Schema> oldDefinitions;
+    Map<String, Schema> newDefinitions;
 
     private ModelDiff() {
-        increased = new ArrayList<ElProperty>();
-        missing = new ArrayList<ElProperty>();
-        changed = new ArrayList<ElProperty>();
+        increased = new ArrayList<>();
+        missing = new ArrayList<>();
+        changed = new ArrayList<>();
     }
 
-    public static ModelDiff buildWithDefinition(Map<String, Model> left, Map<String, Model> right) {
+    public static ModelDiff buildWithDefinition(Map<String, Schema> left, Map<String, Schema> right) {
         ModelDiff diff = new ModelDiff();
-        diff.oldDedinitions = left;
-        diff.newDedinitions = right;
+        diff.oldDefinitions = left != null ? left : new HashMap<>();
+        diff.newDefinitions = right != null ? right : new HashMap<>();
         return diff;
     }
 
-    public ModelDiff diff(Model leftModel, Model rightModel) {
-        return this.diff(leftModel, rightModel, null, new HashSet<Model>());
+    public ModelDiff diff(Schema leftModel, Schema rightModel) {
+        return this.diff(leftModel, rightModel, null, new HashSet<>());
     }
 
-    public ModelDiff diff(Model leftModel, Model rightModel, String parentEl) {
-        return this.diff(leftModel, rightModel, parentEl, new HashSet<Model>());
+    public ModelDiff diff(Schema leftModel, Schema rightModel, String parentEl) {
+        return this.diff(leftModel, rightModel, parentEl, new HashSet<>());
     }
 
-    public ModelDiff diff(Property leftProperty, Property rightProperty) {
-        return this.diff(findModel(leftProperty, oldDedinitions), findModel(rightProperty, newDedinitions));
+    /** Entry point when comparing two property-level schemas (resolves $ref before diffing) */
+    public ModelDiff diffSchema(Schema leftProperty, Schema rightProperty) {
+        return this.diff(resolveRef(leftProperty, oldDefinitions),
+                resolveRef(rightProperty, newDefinitions));
     }
 
-    private ModelDiff diff(Model leftInputModel, Model rightInputModel, String parentEl, Set<Model> visited) {
-        // Stop recursing if both models are null
-        // OR either model is already contained in the visiting history
-        if ((null == leftInputModel && null == rightInputModel) || visited.contains(leftInputModel)
+    private ModelDiff diff(Schema leftInputModel, Schema rightInputModel,
+                           String parentEl, Set<Schema> visited) {
+        if ((null == leftInputModel && null == rightInputModel)
+                || visited.contains(leftInputModel)
                 || visited.contains(rightInputModel)) {
             return this;
         }
-        Model leftModel = isModelReference(leftInputModel) ? findReferenceModel(leftInputModel, oldDedinitions)
-                : leftInputModel;
-        Model rightModel = isModelReference(rightInputModel) ? findReferenceModel(rightInputModel, newDedinitions)
-                : rightInputModel;
-        Map<String, Property> leftProperties = null == leftModel ? null : leftModel.getProperties();
-        Map<String, Property> rightProperties = null == rightModel ? null : rightModel.getProperties();
 
-        // Diff the properties
-        MapKeyDiff<String, Property> propertyDiff = MapKeyDiff.diff(leftProperties, rightProperties);
+        Schema leftModel = resolveRef(leftInputModel, oldDefinitions);
+        Schema rightModel = resolveRef(rightInputModel, newDefinitions);
 
-        increased.addAll(convert2ElPropertys(propertyDiff.getIncreased(), parentEl));
-        missing.addAll(convert2ElPropertys(propertyDiff.getMissing(), parentEl));
+        while (leftModel != null && leftModel.getItems() != null && rightModel != null && rightModel.getItems() != null) {
+            leftModel = resolveRef(leftModel.getItems(), oldDefinitions);
+            rightModel = resolveRef(rightModel.getItems(), newDefinitions);
+        }
 
-        // Recursively find the diff between properties
+        Map<String, Schema> leftProperties = leftModel == null ? null : leftModel.getProperties();
+        Map<String, Schema> rightProperties = rightModel == null ? null : rightModel.getProperties();
+
+        MapKeyDiff<String, Schema> propertyDiff = MapKeyDiff.diff(leftProperties, rightProperties);
+
+        increased.addAll(convert2ElProperties(propertyDiff.getIncreased(), parentEl));
+        missing.addAll(convert2ElProperties(propertyDiff.getMissing(), parentEl));
+
+        Set<Schema> newVisited = copyAndAdd(visited, leftModel, rightModel);
+
         List<String> sharedKey = propertyDiff.getSharedKey();
-        sharedKey.stream().forEach((key) -> {
-            Property left = leftProperties.get(key);
-            Property right = rightProperties.get(key);
-            Model leftSubModel = findModel(left, oldDedinitions);
-            Model rightSubModel = findModel(left, newDedinitions);
-            if (leftSubModel != null || rightSubModel != null) {
-                diff(leftSubModel, rightSubModel, buildElString(parentEl, key),
-                        copyAndAdd(visited, leftModel, rightModel));
-            } else if (left != null && right != null && !left.equals(right)) {
-                // Add a changed ElProperty if not a Reference
-                // Useless
-                changed.add(addChangeMetadata(convert2ElProperty(key, parentEl, left), left, right));
+        sharedKey.forEach(key -> {
+            Schema left = leftProperties.get(key);
+            Schema right = rightProperties.get(key);
+
+            // Try to resolve as sub-model (ref or object with properties)
+            Schema leftSub = resolveToSubModel(left, oldDefinitions);
+            Schema rightSub = resolveToSubModel(right, newDefinitions);
+
+            if (leftSub != null || rightSub != null) {
+                diff(leftSub, rightSub, buildElString(parentEl, key), newVisited);
+            } else if (left != null && right != null) {
+                ElProperty diffProp = convert2ElProperty(key, parentEl, left);
+                addChangeMetadata(diffProp, left, right);
+                if (diffProp.isTypeChange() || diffProp.isNewEnums() || diffProp.isRemovedEnums()) {
+                    changed.add(diffProp);
+                }
             }
         });
+
         return this;
     }
 
-    private Collection<? extends ElProperty> convert2ElPropertys(Map<String, Property> propMap, String parentEl) {
+    /** Returns the resolved object schema if schema is a $ref or has properties; null otherwise */
+    private Schema resolveToSubModel(Schema schema, Map<String, Schema> definitions) {
+        if (schema == null) return null;
+        if (schema.get$ref() != null) {
+            return definitions.get(getSimpleRef(schema.get$ref()));
+        }
+        // Array: try to resolve items
+        if (schema.getItems() != null) {
+            String itemRef = schema.getItems().get$ref();
+            if (itemRef != null) {
+                return definitions.get(getSimpleRef(itemRef));
+            }
+            if (schema.getItems().getProperties() != null && !schema.getItems().getProperties().isEmpty()) {
+                return schema.getItems();
+            }
+        }
+        // Object inline with properties
+        if (schema.getProperties() != null && !schema.getProperties().isEmpty()) {
+            return schema;
+        }
+        return null;
+    }
 
-        List<ElProperty> result = new ArrayList<ElProperty>();
-        if (null == propMap) return result;
+    /** Resolve a $ref schema to the referenced schema in definitions */
+    private Schema resolveRef(Schema schema, Map<String, Schema> definitions) {
+        if (schema == null) return null;
+        if (schema.get$ref() != null) {
+            String name = getSimpleRef(schema.get$ref());
+            Schema resolved = definitions.get(name);
+            return resolved != null ? resolved : schema;
+        }
+        return schema;
+    }
 
-        for (Entry<String, Property> entry : propMap.entrySet()) {
-            // TODO Recursively get the properties
+    private boolean schemasCompatible(Schema left, Schema right) {
+        String lt = left.getType();
+        String rt = right.getType();
+        if (lt != null && !lt.equals(rt)) return false;
+        String lr = left.get$ref();
+        String rr = right.get$ref();
+        if (lr != null && !lr.equals(rr)) return false;
+        return true;
+    }
+
+    private Collection<? extends ElProperty> convert2ElProperties(
+            Map<String, Schema> propMap, String parentEl) {
+        List<ElProperty> result = new ArrayList<>();
+        if (propMap == null) return result;
+        for (Entry<String, Schema> entry : propMap.entrySet()) {
             result.add(convert2ElProperty(entry.getKey(), parentEl, entry.getValue()));
         }
         return result;
@@ -114,21 +163,25 @@ public class ModelDiff {
         return null == parentEl ? propName : (parentEl + "." + propName);
     }
 
-    private ElProperty convert2ElProperty(String propName, String parentEl, Property property) {
+    private ElProperty convert2ElProperty(String propName, String parentEl, Schema schema) {
         ElProperty pWithPath = new ElProperty();
-        pWithPath.setProperty(property);
+        pWithPath.setProperty(schema);
         pWithPath.setEl(buildElString(parentEl, propName));
         return pWithPath;
     }
 
-    private ElProperty addChangeMetadata(ElProperty diffProperty, Property left, Property right) {
-        diffProperty.setTypeChange(!left.getType().equalsIgnoreCase(right.getType()));
+    private ElProperty addChangeMetadata(ElProperty diffProperty, Schema left, Schema right) {
+        String leftType = left.getType();
+        String rightType = right.getType();
+        diffProperty.setTypeChange(leftType != null && !leftType.equalsIgnoreCase(
+                rightType != null ? rightType : ""));
+
         List<String> leftEnums = enumValues(left);
         List<String> rightEnums = enumValues(right);
         if (!leftEnums.isEmpty() && !rightEnums.isEmpty()) {
             ListDiff<String> enumDiff = ListDiff.diff(leftEnums, rightEnums, (t, enumVal) -> {
                 for (String value : t) {
-                    if (enumVal.equalsIgnoreCase(value)) { return value; }
+                    if (enumVal.equalsIgnoreCase(value)) return value;
                 }
                 return null;
             });
@@ -140,70 +193,33 @@ public class ModelDiff {
 
     @SuppressWarnings("unchecked")
     private <T> Set<T> copyAndAdd(Set<T> set, T... add) {
-        Set<T> newSet = new HashSet<T>(set);
+        Set<T> newSet = new HashSet<>(set);
         newSet.addAll(Arrays.asList(add));
         return newSet;
     }
 
-    private List<String> enumValues(Property prop) {
-        if (prop instanceof StringProperty && ((StringProperty) prop).getEnum() != null) {
-            return ((StringProperty) prop).getEnum();
-        } else {
-            return new ArrayList<>();
-        }
-    }
-
-    private Model findModel(Property property, Map<String, Model> modelMap) {
-        String modelName = null;
-        if (property instanceof RefProperty) {
-            modelName = ((RefProperty) property).getSimpleRef();
-        } else if (property instanceof ArrayProperty) {
-            Property arrayType = ((ArrayProperty) property).getItems();
-            if (arrayType instanceof RefProperty) {
-                modelName = ((RefProperty) arrayType).getSimpleRef();
+    private List<String> enumValues(Schema schema) {
+        List<String> result = new ArrayList<>();
+        if (schema.getEnum() != null) {
+            for (Object val : schema.getEnum()) {
+                if (val != null) result.add(val.toString());
             }
         }
-        return modelName == null ? null : modelMap.get(modelName);
+        return result;
     }
 
-    private boolean isModelReference(Model model) {
-        return model instanceof RefModel || model instanceof ArrayModel;
+    private String getSimpleRef(String ref) {
+        if (ref == null) return null;
+        int lastSlash = ref.lastIndexOf('/');
+        return lastSlash >= 0 ? ref.substring(lastSlash + 1) : ref;
     }
 
-    private Model findReferenceModel(Model model, Map<String, Model> modelMap) {
-        String modelName = null;
-        if (model instanceof RefModel) {
-            modelName = ((RefModel) model).getSimpleRef();
-        } else if (model instanceof ArrayModel) {
-            Property arrayType = ((ArrayModel) model).getItems();
-            if (arrayType instanceof RefProperty) {
-                modelName = ((RefProperty) arrayType).getSimpleRef();
-            }
-        }
-        return modelName == null ? null : modelMap.get(modelName);
-    }
+    public List<ElProperty> getIncreased() { return increased; }
+    public void setIncreased(List<ElProperty> increased) { this.increased = increased; }
 
-    public List<ElProperty> getIncreased() {
-        return increased;
-    }
+    public List<ElProperty> getMissing() { return missing; }
+    public void setMissing(List<ElProperty> missing) { this.missing = missing; }
 
-    public void setIncreased(List<ElProperty> increased) {
-        this.increased = increased;
-    }
-
-    public List<ElProperty> getMissing() {
-        return missing;
-    }
-
-    public void setMissing(List<ElProperty> missing) {
-        this.missing = missing;
-    }
-
-    public List<ElProperty> getChanged() {
-        return changed;
-    }
-
-    public void setChanged(List<ElProperty> changed) {
-        this.changed = changed;
-    }
+    public List<ElProperty> getChanged() { return changed; }
+    public void setChanged(List<ElProperty> changed) { this.changed = changed; }
 }

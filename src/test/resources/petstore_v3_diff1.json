@@ -1,0 +1,38 @@
+{
+  "openapi": "3.0.1",
+  "info": { "title": "API", "version": "1.0" },
+  "paths": {
+    "/item": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name", "oldName", "size"],
+                "properties": {
+                  "name": { "type": "string" },
+                  "oldName": { "type": "string", "deprecated": true },
+                  "size": { "type": "integer", "deprecated": true }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+          "description": "ok",
+          "headers": {
+            "X-Rate-Limit": { "description": "calls per hour", "schema": { "type": "integer" } },
+            "X-Deprecated-Header": { "schema": { "type": "string" } }
+          },
+          "content": {
+            "application/json": { "schema": { "type": "object", "properties": { "id": { "type": "integer" } } } }
+          }
+        },
+          "404": { "description": "bad request" }
+        }
+      }
+    }
+  }
+}

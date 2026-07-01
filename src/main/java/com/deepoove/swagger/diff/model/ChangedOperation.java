@@ -1,40 +1,50 @@
 package com.deepoove.swagger.diff.model;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
-import io.swagger.models.parameters.Parameter;
+import io.swagger.v3.oas.models.PathItem;
+import io.swagger.v3.oas.models.Operation;
+
+import io.swagger.v3.oas.models.responses.ApiResponse;
 
 public class ChangedOperation implements Changed {
 
     private String summary;
 
-    private List<Parameter> addParameters = new ArrayList<Parameter>();
-    private List<Parameter> missingParameters = new ArrayList<Parameter>();
+    private List<io.swagger.v3.oas.models.parameters.Parameter> addParameters = new ArrayList<>();
+    private List<io.swagger.v3.oas.models.parameters.Parameter> missingParameters = new ArrayList<>();
 
-    private List<ChangedParameter> changedParameter = new ArrayList<ChangedParameter>();
+    private List<ChangedParameter> changedParameter = new ArrayList<>();
 
-    private List<ElProperty> addProps = new ArrayList<ElProperty>();
-    private List<ElProperty> missingProps = new ArrayList<ElProperty>();
-    private List<ElProperty> changedProps = new ArrayList<ElProperty>();
+    private List<ElProperty> addProps = new ArrayList<>();
+    private List<ElProperty> missingProps = new ArrayList<>();
+    private List<ElProperty> changedProps = new ArrayList<>();
+
+    private List<ElProperty> addRequestProps = new ArrayList<>();
+    private List<ElProperty> missingRequestProps = new ArrayList<>();
+    private List<ElProperty> changedRequestProps = new ArrayList<>();
+
     private List<String> addConsumes = new ArrayList<>();
     private List<String> missingConsumes = new ArrayList<>();
     private List<String> addProduces = new ArrayList<>();
     private List<String> missingProduces = new ArrayList<>();
 
-    public List<Parameter> getAddParameters() {
+    public List<io.swagger.v3.oas.models.parameters.Parameter> getAddParameters() {
         return addParameters;
     }
 
-    public void setAddParameters(List<Parameter> addParameters) {
+    public void setAddParameters(List<io.swagger.v3.oas.models.parameters.Parameter> addParameters) {
         this.addParameters = addParameters;
     }
 
-    public List<Parameter> getMissingParameters() {
+    public List<io.swagger.v3.oas.models.parameters.Parameter> getMissingParameters() {
         return missingParameters;
     }
 
-    public void setMissingParameters(List<Parameter> missingParameters) {
+    public void setMissingParameters(List<io.swagger.v3.oas.models.parameters.Parameter> missingParameters) {
         this.missingParameters = missingParameters;
     }
 
@@ -79,12 +89,18 @@ public class ChangedOperation implements Changed {
     }
 
     public boolean isDiff() {
-        return !addParameters.isEmpty() || !missingParameters.isEmpty() || !changedParameter.isEmpty() || isDiffProp()
-                || isDiffConsumes() || isDiffProduces();
+        return !addParameters.isEmpty() || !missingParameters.isEmpty() || !changedParameter.isEmpty()
+                || isDiffProp() || isDiffRequestProp() || isDiffConsumes() || isDiffProduces()|| !addResponses.isEmpty()
+            || !missingResponses.isEmpty() || !changedResponses.isEmpty();
     }
+
 
     public boolean isDiffProp() {
         return !addProps.isEmpty() || !missingProps.isEmpty() || !changedProps.isEmpty();
+    }
+
+    public boolean isDiffRequestProp() {
+        return !addRequestProps.isEmpty() || !missingRequestProps.isEmpty() || !changedRequestProps.isEmpty();
     }
 
     public boolean isDiffParam() {
@@ -129,5 +145,50 @@ public class ChangedOperation implements Changed {
 
     public void setMissingProduces(List<String> missing) {
         this.missingProduces = missing == null ? new ArrayList<>() : missing;
+    }
+
+    public List<ElProperty> getAddRequestProps() {
+        return addRequestProps;
+    }
+
+    public void setAddRequestProps(List<ElProperty> addRequestProps) {
+        this.addRequestProps = addRequestProps;
+    }
+
+    public List<ElProperty> getMissingRequestProps() {
+        return missingRequestProps;
+    }
+
+    public void setMissingRequestProps(List<ElProperty> missingRequestProps) {
+        this.missingRequestProps = missingRequestProps;
+    }
+
+    public List<ElProperty> getChangedRequestProps() {
+        return changedRequestProps;
+    }
+
+    public void setChangedRequestProps(List<ElProperty> changedRequestProps) {
+        this.changedRequestProps = changedRequestProps;
+    }
+
+    // --- Response diffs per status code ---
+    private Map<String, ApiResponse> addResponses = new LinkedHashMap<>();
+    private Map<String, ApiResponse> missingResponses = new LinkedHashMap<>();
+    // status presenti in entrambi ma con schema cambiato
+    private List<ChangedResponse> changedResponses = new ArrayList<>();
+
+    public Map<String, ApiResponse> getAddResponses() { return addResponses; }
+    public void setAddResponses(Map<String, ApiResponse> addResponses) {
+        this.addResponses = addResponses != null ? addResponses : new LinkedHashMap<>();
+    }
+
+    public Map<String, ApiResponse> getMissingResponses() { return missingResponses; }
+    public void setMissingResponses(Map<String, ApiResponse> missingResponses) {
+        this.missingResponses = missingResponses != null ? missingResponses : new LinkedHashMap<>();
+    }
+
+    public List<ChangedResponse> getChangedResponses() { return changedResponses; }
+    public void setChangedResponses(List<ChangedResponse> changedResponses) {
+        this.changedResponses = changedResponses != null ? changedResponses : new ArrayList<>();
     }
 }
